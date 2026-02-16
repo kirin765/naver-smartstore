@@ -25,9 +25,23 @@ export default async function DashboardLayout({
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/dashboard" className="text-xl font-bold">
-            🛒 SmartStore AI
-          </Link>
+          <div className="flex items-center gap-6">
+            <Link href="/dashboard" className="text-xl font-bold">
+              🛒 SmartStore AI
+            </Link>
+            
+            <nav className="hidden md:flex gap-4">
+              <Link href="/dashboard" className="text-gray-600 hover:text-gray-900">
+                대시보드
+              </Link>
+              <Link href="/products" className="text-gray-600 hover:text-gray-900">
+                상품 목록
+              </Link>
+              <Link href="/settings" className="text-gray-600 hover:text-gray-900">
+                설정
+              </Link>
+            </nav>
+          </div>
           
           <div className="flex items-center gap-4">
             <div className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
