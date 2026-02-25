@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { MAX_IMAGE_UPLOAD_COUNT } from '@naver-smartstore/shared/constants'
+import { MAX_IMAGE_UPLOAD_COUNT } from '@/lib/shared/constants'
 
 type Params = { params: { id: string } }
 

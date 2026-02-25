@@ -5,7 +5,7 @@ import {
   ALLOWED_IMAGE_MIME_TYPES,
   MAX_IMAGE_UPLOAD_BYTES,
   MAX_IMAGE_UPLOAD_COUNT,
-} from '@naver-smartstore/shared/constants'
+} from '@/lib/shared/constants'
 
 const STORAGE_BUCKET = 'product-images'
 

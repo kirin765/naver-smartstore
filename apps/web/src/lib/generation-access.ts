@@ -1,4 +1,4 @@
-import { CREDIT_COSTS } from '@naver-smartstore/shared/constants'
+import { CREDIT_COSTS } from '@/lib/shared/constants'
 import { createClient } from './supabase/server'
 
 export type GenerationAction = 'title' | 'description' | 'bullet' | 'tags' | 'full'
