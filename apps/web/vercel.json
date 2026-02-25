@@ -1,5 +1,5 @@
 {
-  "installCommand": "npm install --no-audit --ignore-scripts",
+  "installCommand": "npm install --prefix .. --no-audit --ignore-scripts",
   "buildCommand": "npm run build",
   "outputDirectory": ".next",
   "framework": "nextjs"
