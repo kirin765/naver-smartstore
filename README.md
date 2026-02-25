@@ -158,6 +158,51 @@ Preview:
 corepack pnpm dlx vercel --scope <VERCEL_SCOPE> --token <VERCEL_TOKEN> --project <VERCEL_PREVIEW_PROJECT_ID> --cwd apps/web --yes
 ```
 
+### Vercel 환경 동기화 자동화 스크립트
+
+`scripts/vercel-bootstrap.sh`를 사용하면 Vercel 프로젝트 환경변수를 일괄 동기화할 수 있습니다.
+
+필요 값:
+- `VERCEL_TOKEN`
+- `VERCEL_SCOPE`
+- `VERCEL_PROJECT_ID`(Production)
+- `VERCEL_STAGING_PROJECT_ID`(Staging)
+- `VERCEL_PREVIEW_PROJECT_ID`(Preview)
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `OPENAI_API_KEY`
+- `NEXT_PUBLIC_APP_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `PADDLE_CHECKOUT_URL`
+- `PADDLE_WEBHOOK_SECRET`
+- `PADDLE_API_TOKEN`(선택)
+- `PADDLE_VENDOR_ID`(선택)
+
+실행 예시:
+```bash
+export VERCEL_TOKEN=...
+export VERCEL_SCOPE=<team-slug-or-id>
+export VERCEL_PROJECT_ID=<prod-project-id>
+export VERCEL_STAGING_PROJECT_ID=<staging-project-id>
+export VERCEL_PREVIEW_PROJECT_ID=<preview-project-id>
+
+export NEXT_PUBLIC_SUPABASE_URL=...
+export NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+export OPENAI_API_KEY=...
+export NEXT_PUBLIC_APP_URL=https://your-domain
+export SUPABASE_SERVICE_ROLE_KEY=...
+export PADDLE_CHECKOUT_URL=...
+export PADDLE_WEBHOOK_SECRET=...
+export PADDLE_API_TOKEN=...
+export PADDLE_VENDOR_ID=...
+
+# dry-run
+bash scripts/vercel-bootstrap.sh apps/web 1
+
+# apply
+bash scripts/vercel-bootstrap.sh apps/web 0
+```
+
 ### B. 수동 Node 실행
 
 ```bash
