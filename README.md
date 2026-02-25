@@ -77,13 +77,23 @@ supabase db reset
 ### A. Vercel 배포(권장)
 
 1. GitHub 저장소 연결
-2. 빌드 설정
+2. Vercel 프로젝트 설정 (monorepo 핵심)
    - Framework: Next.js
-   - Install Command: `pnpm install`
+   - Root Directory: `apps/web`
+   - Install Command: `corepack enable && pnpm install --frozen-lockfile=false`
    - Build Command: `pnpm build`
-   - Output Directory: (기본값)
+   - Output Directory: `.next`
 3. 루트 환경변수 등록
-   - `NEXT_PUBLIC_*`, `OPENAI_API_KEY`, `PADDLE_*` 전부 등록
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `OPENAI_API_KEY`
+   - `NEXT_PUBLIC_APP_URL` (운영 도메인)
+   - `SUPABASE_SERVICE_ROLE_KEY` (서버 작업용)
+   - `PADDLE_WEBHOOK_SECRET`
+   - `PADDLE_CHECKOUT_URL`
+   - `PADDLE_API_TOKEN` (선택)
+   - `PADDLE_VENDOR_ID` (선택)
+   - `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, `VERCEL_SCOPE`(선택)은 GitHub Secrets에 등록
 4. 배포 후 앱 URL 확인
    - 사용자 로그인, 상품 등록, 분석/생성/결제 흐름 점검
 
@@ -136,11 +146,12 @@ pnpm start
 
 - CI: `/.github/workflows/ci.yml`
   - 트리거: `main` 브랜치 push, `main` 대상 pull request
-  - 실행: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`
+  - 실행: `pnpm test`, `pnpm build`
 - Deploy: `/.github/workflows/deploy.yml`
   - 트리거: `main` 브랜치 push
-  - 동작: `pnpm build` 후 Vercel 배포
+  - 동작: `pnpm --filter web build` 후 `apps/web` 기준 Vercel 배포
   - 배포 실행 조건: `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` Secret이 등록된 경우에만 수행
+  - 배포 명령(동작 기준): `pnpm dlx vercel --prod --token "$VERCEL_TOKEN" --scope "$VERCEL_SCOPE" --yes --confirm --project "$VERCEL_PROJECT_ID" --cwd apps/web`
 
 ### GitHub Actions Secrets (권장)
 - `VERCEL_TOKEN`

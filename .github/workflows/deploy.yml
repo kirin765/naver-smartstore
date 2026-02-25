@@ -33,11 +33,18 @@ jobs:
         run: pnpm install --frozen-lockfile=false
 
       - name: Build
-        run: pnpm build
+        run: pnpm --filter web build
 
       - name: Vercel Deploy
         if: ${{ env.VERCEL_TOKEN != '' && env.VERCEL_ORG_ID != '' && env.VERCEL_PROJECT_ID != '' }}
-        run: pnpm dlx vercel --prod --token "$VERCEL_TOKEN" --scope "$VERCEL_SCOPE" --yes
+        run: |
+          pnpm dlx vercel --prod \
+            --token "$VERCEL_TOKEN" \
+            --scope "$VERCEL_SCOPE" \
+            --yes \
+            --confirm \
+            --project "$VERCEL_PROJECT_ID" \
+            --cwd apps/web
 
       - name: Deployment skipped (missing Vercel secrets)
         if: ${{ !(env.VERCEL_TOKEN != '' && env.VERCEL_ORG_ID != '' && env.VERCEL_PROJECT_ID != '') }}
