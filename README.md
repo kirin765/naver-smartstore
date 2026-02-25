@@ -159,3 +159,33 @@ pnpm start
 - `VERCEL_PROJECT_ID`
 - `VERCEL_SCOPE` (선택)
 - `PADDLE_WEBHOOK_SECRET` 등 운영용 민감 값은 배포 환경/웹훅 환경변수로 별도 등록
+
+## 11) Vercel 운영 점검 체크리스트
+
+- [ ] Vercel 프로젝트에서 Root Directory가 `apps/web`으로 고정되어 있는지 확인
+- [ ] Build Command: `pnpm build`
+- [ ] Install Command: `corepack enable && pnpm install --frozen-lockfile=false`
+- [ ] Output Directory: `.next`
+- [ ] Production 브랜치가 `main`으로 설정되어 있고, Auto Deploy가 `main` push만 처리하는지 확인
+- [ ] 아래 환경변수 존재 여부 확인(운영/미리보기 동일 키로 분기)
+  - `NEXT_PUBLIC_SUPABASE_URL`
+  - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+  - `OPENAI_API_KEY`
+  - `NEXT_PUBLIC_APP_URL`
+  - `SUPABASE_SERVICE_ROLE_KEY`
+  - `PADDLE_WEBHOOK_SECRET`
+  - `PADDLE_CHECKOUT_URL`
+  - `PADDLE_API_TOKEN`(선택)
+  - `PADDLE_VENDOR_ID`(선택)
+- [ ] 도메인 연결 후 HTTPS 동작 확인 (`https://your-domain`)
+- [ ] Paddle Webhook URL 등록: `https://your-domain/api/webhooks/paddle`
+- [ ] 샘플 결제/구독 이벤트에서 크레딧/구독 상태 반영 확인
+  - `payment_success`
+  - `subscription_created`
+  - `subscription_updated`
+  - `subscription_cancelled`
+- [ ] `/api/webhooks/paddle`의 Idempotency(중복 이벤트 처리) 동작 확인
+- [ ] 배포 후 Smoke 체크
+  - `/products`, `/products/new`, `/settings` 접근
+  - `POST /api/analyze/product-image`
+  - `POST /api/generate/full`
