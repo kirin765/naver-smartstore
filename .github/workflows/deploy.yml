@@ -99,20 +99,49 @@ jobs:
           echo "project_id=$PROJECT_ID" >> "$GITHUB_OUTPUT"
           echo "target_args=$TARGET_ARGS" >> "$GITHUB_OUTPUT"
 
+          if [ -n "$VERCEL_SCOPE" ]; then
+            RESOLVE_SCOPE="$VERCEL_SCOPE"
+          else
+            RESOLVE_SCOPE="$VERCEL_ORG_ID"
+          fi
+
+          if [ -z "$RESOLVE_SCOPE" ]; then
+            echo "::error::Missing VERCEL_SCOPE and VERCEL_ORG_ID. set one of them."
+          fi
+
+          echo "scope=$RESOLVE_SCOPE" >> "$GITHUB_OUTPUT"
+
+      - name: Validate Vercel credentials
+        id: credential
+        run: |
+          if [ -z "${{ steps.target.outputs.project_id }}" ]; then
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            echo "reason=missing_project" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ -z "${{ steps.target.outputs.scope }}" ] || [ -z "${{ env.VERCEL_TOKEN }}" ]; then
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            echo "reason=missing_credentials" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "ok=true" >> "$GITHUB_OUTPUT"
+
       - name: Vercel Deploy
-        if: ${{ env.VERCEL_TOKEN != '' && env.VERCEL_ORG_ID != '' && steps.target.outputs.project_id != '' }}
+        if: ${{ steps.credential.outputs.ok == 'true' }}
         run: |
           corepack pnpm dlx vercel \
             ${{ steps.target.outputs.target_args }} \
             --token "$VERCEL_TOKEN" \
-            --scope "$VERCEL_SCOPE" \
+            --scope "${{ steps.target.outputs.scope }}" \
             --yes \
             --project "${{ steps.target.outputs.project_id }}" \
             --cwd apps/web
 
       - name: Deployment skipped (missing Vercel secrets)
-        if: ${{ !(env.VERCEL_TOKEN != '' && env.VERCEL_ORG_ID != '') }}
-        run: echo "Vercel secrets are not set; skip deploy."
+        if: ${{ steps.credential.outputs.ok == 'false' && steps.credential.outputs.reason == 'missing_credentials' }}
+        run: echo "Vercel credentials are not set (VERCEL_TOKEN + VERCEL_SCOPE / VERCEL_ORG_ID); skip deploy."
 
       - name: Deployment skipped (missing target project)
         if: ${{ steps.target.outputs.project_id == '' }}

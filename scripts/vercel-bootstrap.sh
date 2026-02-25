@@ -6,6 +6,7 @@ SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_ROOT/.." && pwd)"
 APP_DIR="${1:-$REPO_ROOT/apps/web}"
 DRY_RUN="${2:-0}"
+ENV_FILE="${3:-${VERCEL_ENV_FILE:-}}"
 
 if [ "$DRY_RUN" != "0" ] && [ "$DRY_RUN" != "1" ]; then
   echo "Usage: $0 [APP_DIR] [DRY_RUN=0|1]"
@@ -38,7 +39,23 @@ fi
 run_vercel() {
   local cmd=("$@")
   if [ "$DRY_RUN" = "1" ]; then
-    printf '[dry-run] %s\n' "${cmd[*]}"
+    local masked=()
+    local token_index=-1
+    local i
+
+    for i in "${!cmd[@]}"; do
+      if [ "${cmd[$i]}" = "--token" ] && [ $((i+1)) -lt ${#cmd[@]} ]; then
+        masked+=("${cmd[$i]}")
+        masked+=("***REDACTED***")
+        token_index=$((i+1))
+      elif [ "$token_index" = "$i" ]; then
+        :
+      else
+        masked+=("${cmd[$i]}")
+      fi
+    done
+
+    printf '[dry-run] %s\n' "${masked[*]}"
     return 0
   fi
   "${cmd[@]}"
@@ -53,14 +70,16 @@ trap cleanup EXIT
 run_for_env() {
   local project_id="$1"
   local project_name="$2"
-  local -n var_map=$3
+  local var_block="$3"
 
   local link_cmd=(npx vercel link --yes --project "$project_id" --scope "$VERCEL_SCOPE" --token "$VERCEL_TOKEN" --cwd "$APP_DIR" --global-config "$tmp_global_dir")
   run_vercel "${link_cmd[@]}"
 
-  for key in "${!var_map[@]}"; do
-    local settings="${var_map[$key]}"
-    IFS='|' read -r _value_is_required _value_is_sensitive _targets _unused <<< "$settings"
+  while IFS='|' read -r key _value_is_required _value_is_sensitive _targets _unused; do
+    if [ -z "$key" ] || [[ "$key" == \#* ]]; then
+      continue
+    fi
+
     local value="${!key:-}"
     local is_required="$_value_is_required"
     local is_sensitive="$_value_is_sensitive"
@@ -76,72 +95,110 @@ run_for_env() {
       continue
     fi
 
-    local sensitive_flag=()
-    if [ "$is_sensitive" = "true" ]; then
-      sensitive_flag=(--sensitive)
-    fi
-
     if [ -z "$targets" ]; then
       continue
     fi
 
     for target in ${targets//,/ }; do
       echo "[set] $project_name - $key -> $target"
-      local add_cmd=(npx vercel env add "$key" "$target" --value "$value" --yes --force "${sensitive_flag[@]}" --scope "$VERCEL_SCOPE" --token "$VERCEL_TOKEN" --cwd "$APP_DIR" --global-config "$tmp_global_dir")
+      if [ "$is_sensitive" = "true" ]; then
+        local add_cmd=(npx vercel env add "$key" "$target" --value "$value" --yes --force --sensitive --scope "$VERCEL_SCOPE" --token "$VERCEL_TOKEN" --cwd "$APP_DIR" --global-config "$tmp_global_dir")
+      else
+        local add_cmd=(npx vercel env add "$key" "$target" --value "$value" --yes --force --scope "$VERCEL_SCOPE" --token "$VERCEL_TOKEN" --cwd "$APP_DIR" --global-config "$tmp_global_dir")
+      fi
       run_vercel "${add_cmd[@]}"
     done
-  done
+  done <<EOF
+${var_block}
+EOF
 }
 
-declare -A PRODUCTION_VARS
-PRODUCTION_VARS=(
-  [NEXT_PUBLIC_SUPABASE_URL]="required|false|production,preview,development|"
-  [NEXT_PUBLIC_SUPABASE_ANON_KEY]="required|false|production,preview,development|"
-  [OPENAI_API_KEY]="required|true|production,preview,development|"
-  [NEXT_PUBLIC_APP_URL]="required|false|production,preview,development|"
-  [SUPABASE_SERVICE_ROLE_KEY]="required|true|production,preview,development|"
-  [PADDLE_CHECKOUT_URL]="required|false|production,preview,development|"
-  [PADDLE_WEBHOOK_SECRET]="required|true|production,preview,development|"
-  [PADDLE_API_TOKEN]="optional|true|production,preview,development|"
-  [PADDLE_VENDOR_ID]="optional|true|production,preview,development|"
-)
+load_env_file() {
+  local file_path="$1"
+  if [ ! -f "$file_path" ]; then
+    echo "Error: env file '$file_path' not found."
+    exit 1
+  fi
 
-declare -A STAGING_VARS
-STAGING_VARS=(
-  [NEXT_PUBLIC_SUPABASE_URL]="required|false|production,development|"
-  [NEXT_PUBLIC_SUPABASE_ANON_KEY]="required|false|production,development|"
-  [OPENAI_API_KEY]="required|true|production,development|"
-  [NEXT_PUBLIC_APP_URL]="required|false|production,development|"
-  [SUPABASE_SERVICE_ROLE_KEY]="required|true|production,development|"
-  [PADDLE_CHECKOUT_URL]="required|false|production,development|"
-  [PADDLE_WEBHOOK_SECRET]="required|true|production,development|"
-  [PADDLE_API_TOKEN]="optional|true|production,development|"
-  [PADDLE_VENDOR_ID]="optional|true|production,development|"
-)
+  echo "Loading variables from $file_path"
+  while IFS='=' read -r key value; do
+    key="${key#"${key%%[![:space:]]*}"}"
+    key="${key%"${key##*[![:space:]]}"}"
+    if [ -z "$key" ] || [[ "$key" == \#* ]]; then
+      continue
+    fi
+    if [[ "$key" == "OPENAI_API_KEY" || "$key" == "SUPABASE_URL" || "$key" == "SUPABASE_ANON_KEY" || "$key" == "SUPABASE_SERVICE_ROLE_KEY" || "$key" == "PADDLE_WEBHOOK_SECRET" || "$key" == "PADDLE_API_KEY" || "$key" == "PADDLE_VENDOR_ID" || "$key" == "PADDLE_CHECKOUT_URL" || "$key" == "APP_BASE_URL" ]]; then
+      export "$key"="${value}"
+    fi
+  done < "$file_path"
 
-declare -A PREVIEW_VARS
-PREVIEW_VARS=(
-  [NEXT_PUBLIC_SUPABASE_URL]="required|false|preview,development|"
-  [NEXT_PUBLIC_SUPABASE_ANON_KEY]="required|false|preview,development|"
-  [OPENAI_API_KEY]="required|true|preview,development|"
-  [NEXT_PUBLIC_APP_URL]="required|false|preview,development|"
-  [SUPABASE_SERVICE_ROLE_KEY]="required|true|preview,development|"
-  [PADDLE_CHECKOUT_URL]="required|false|preview,development|"
-  [PADDLE_WEBHOOK_SECRET]="required|true|preview,development|"
-  [PADDLE_API_TOKEN]="optional|true|preview,development|"
-  [PADDLE_VENDOR_ID]="optional|true|preview,development|"
-)
+  if [ -n "${SUPABASE_URL:-}" ] && [ -z "${NEXT_PUBLIC_SUPABASE_URL:-}" ]; then
+    export NEXT_PUBLIC_SUPABASE_URL="$SUPABASE_URL"
+  fi
+
+  if [ -n "${SUPABASE_ANON_KEY:-}" ] && [ -z "${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}" ]; then
+    export NEXT_PUBLIC_SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
+  fi
+
+  if [ -n "${PADDLE_API_KEY:-}" ] && [ -z "${PADDLE_API_TOKEN:-}" ]; then
+    export PADDLE_API_TOKEN="$PADDLE_API_KEY"
+  fi
+
+  if [ -n "${APP_BASE_URL:-}" ] && [ -z "${NEXT_PUBLIC_APP_URL:-}" ]; then
+    export NEXT_PUBLIC_APP_URL="$APP_BASE_URL"
+  fi
+}
+
+if [ -n "$ENV_FILE" ]; then
+  load_env_file "$ENV_FILE"
+fi
+
+PRODUCTION_VARS="
+NEXT_PUBLIC_SUPABASE_URL|required|false|production,preview,development|
+NEXT_PUBLIC_SUPABASE_ANON_KEY|required|false|production,preview,development|
+OPENAI_API_KEY|required|true|production,preview,development|
+NEXT_PUBLIC_APP_URL|required|false|production,preview,development|
+SUPABASE_SERVICE_ROLE_KEY|required|true|production,preview,development|
+PADDLE_CHECKOUT_URL|required|false|production,preview,development|
+PADDLE_WEBHOOK_SECRET|required|true|production,preview,development|
+PADDLE_API_TOKEN|optional|true|production,preview,development|
+PADDLE_VENDOR_ID|optional|true|production,preview,development|
+"
+
+STAGING_VARS="
+NEXT_PUBLIC_SUPABASE_URL|required|false|production,development|
+NEXT_PUBLIC_SUPABASE_ANON_KEY|required|false|production,development|
+OPENAI_API_KEY|required|true|production,development|
+NEXT_PUBLIC_APP_URL|required|false|production,development|
+SUPABASE_SERVICE_ROLE_KEY|required|true|production,development|
+PADDLE_CHECKOUT_URL|required|false|production,development|
+PADDLE_WEBHOOK_SECRET|required|true|production,development|
+PADDLE_API_TOKEN|optional|true|production,development|
+PADDLE_VENDOR_ID|optional|true|production,development|
+"
+
+PREVIEW_VARS="
+NEXT_PUBLIC_SUPABASE_URL|required|false|preview,development|
+NEXT_PUBLIC_SUPABASE_ANON_KEY|required|false|preview,development|
+OPENAI_API_KEY|required|true|preview,development|
+NEXT_PUBLIC_APP_URL|required|false|preview,development|
+SUPABASE_SERVICE_ROLE_KEY|required|true|preview,development|
+PADDLE_CHECKOUT_URL|required|false|preview,development|
+PADDLE_WEBHOOK_SECRET|required|true|preview,development|
+PADDLE_API_TOKEN|optional|true|preview,development|
+PADDLE_VENDOR_ID|optional|true|preview,development|
+"
 
 if [ -n "${VERCEL_PROJECT_ID:-}" ]; then
-  run_for_env "$VERCEL_PROJECT_ID" "production" PRODUCTION_VARS
+  run_for_env "$VERCEL_PROJECT_ID" "production" "$PRODUCTION_VARS"
 fi
 
 if [ -n "${VERCEL_STAGING_PROJECT_ID:-}" ]; then
-  run_for_env "$VERCEL_STAGING_PROJECT_ID" "staging" STAGING_VARS
+  run_for_env "$VERCEL_STAGING_PROJECT_ID" "staging" "$STAGING_VARS"
 fi
 
 if [ -n "${VERCEL_PREVIEW_PROJECT_ID:-}" ]; then
-  run_for_env "$VERCEL_PREVIEW_PROJECT_ID" "preview" PREVIEW_VARS
+  run_for_env "$VERCEL_PREVIEW_PROJECT_ID" "preview" "$PREVIEW_VARS"
 fi
 
 echo "Vercel environment bootstrap completed."

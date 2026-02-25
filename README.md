@@ -178,6 +178,8 @@ corepack pnpm dlx vercel --scope <VERCEL_SCOPE> --token <VERCEL_TOKEN> --project
 - `PADDLE_API_TOKEN`(선택)
 - `PADDLE_VENDOR_ID`(선택)
 
+참고: `PADDLE_CHECKOUT_URL`은 필수입니다. 값이 없으면 부트스트랩이 중단됩니다.
+
 실행 예시:
 ```bash
 export VERCEL_TOKEN=...
@@ -199,9 +201,15 @@ export PADDLE_VENDOR_ID=...
 # dry-run
 bash scripts/vercel-bootstrap.sh apps/web 1
 
+# reviewboost env 파일 기준으로 로드 후 적용
+VERCEL_ENV_FILE=/Users/kiwankim/reviewboostenv.txt bash scripts/vercel-bootstrap.sh apps/web 1
+
 # apply
-bash scripts/vercel-bootstrap.sh apps/web 0
+VERCEL_ENV_FILE=/Users/kiwankim/reviewboostenv.txt bash scripts/vercel-bootstrap.sh apps/web 0
 ```
+
+> 보안 주의: `VERCEL_TOKEN` 같은 값은 README/스크립트 로그/채팅창에 하드코딩하거나 출력하지 마세요.
+> 이미 노출된 토큰은 즉시 Vercel에서 재발급하세요.
 
 ### B. 수동 Node 실행
 
