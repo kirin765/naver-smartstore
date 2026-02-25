@@ -4,8 +4,16 @@ on:
   push:
     branches:
       - main
+      - develop
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
+      environment:
+        description: 'Deployment target: production | staging | preview'
+        required: false
+        default: ''
       ref:
         description: 'Deploy this git ref. Default is current checked out SHA.'
         required: false
@@ -16,25 +24,20 @@ jobs:
     name: Deploy to Vercel
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    if: github.ref == 'refs/heads/main'
 
-jobs:
-  deploy:
-    name: Deploy to Vercel
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    if: github.ref == 'refs/heads/main'
     env:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_STAGING_PROJECT_ID: ${{ secrets.VERCEL_STAGING_PROJECT_ID }}
+      VERCEL_PREVIEW_PROJECT_ID: ${{ secrets.VERCEL_PREVIEW_PROJECT_ID }}
       VERCEL_SCOPE: ${{ secrets.VERCEL_SCOPE }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.ref || github.sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -50,17 +53,67 @@ jobs:
       - name: Build
         run: corepack pnpm --filter web build
 
-      - name: Vercel Deploy
-        if: ${{ env.VERCEL_TOKEN != '' && env.VERCEL_ORG_ID != '' && env.VERCEL_PROJECT_ID != '' }}
+      - name: Resolve deployment target
+        id: target
         run: |
-          corepack pnpm dlx vercel --prod \
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.environment }}" ]; then
+            DEPLOY_ENV="${{ github.event.inputs.environment }}"
+          elif [ "${{ github.ref_name }}" = "main" ]; then
+            DEPLOY_ENV="production"
+          elif [ "${{ github.ref_name }}" = "develop" ]; then
+            DEPLOY_ENV="staging"
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+            DEPLOY_ENV="preview"
+          else
+            DEPLOY_ENV="preview"
+          fi
+
+          case "$DEPLOY_ENV" in
+            production)
+              PROJECT_ID="$VERCEL_PROJECT_ID"
+              TARGET_ARGS="--prod --confirm"
+              ;;
+            staging)
+              PROJECT_ID="$VERCEL_STAGING_PROJECT_ID"
+              TARGET_ARGS="--prod --confirm"
+              ;;
+            preview)
+              PROJECT_ID="${VERCEL_PREVIEW_PROJECT_ID:-$VERCEL_STAGING_PROJECT_ID}"
+              TARGET_ARGS="--confirm"
+              ;;
+            *)
+              echo "Invalid environment: $DEPLOY_ENV"
+              exit 1
+              ;;
+          esac
+
+          if [ -z "$PROJECT_ID" ]; then
+            echo "::error::Missing project id for environment '$DEPLOY_ENV'."
+            echo "deploy_env=$DEPLOY_ENV" >> "$GITHUB_OUTPUT"
+            echo "project_id=" >> "$GITHUB_OUTPUT"
+            echo "target_args=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "deploy_env=$DEPLOY_ENV" >> "$GITHUB_OUTPUT"
+          echo "project_id=$PROJECT_ID" >> "$GITHUB_OUTPUT"
+          echo "target_args=$TARGET_ARGS" >> "$GITHUB_OUTPUT"
+
+      - name: Vercel Deploy
+        if: ${{ env.VERCEL_TOKEN != '' && env.VERCEL_ORG_ID != '' && steps.target.outputs.project_id != '' }}
+        run: |
+          corepack pnpm dlx vercel \
+            ${{ steps.target.outputs.target_args }} \
             --token "$VERCEL_TOKEN" \
             --scope "$VERCEL_SCOPE" \
             --yes \
-            --confirm \
-            --project "$VERCEL_PROJECT_ID" \
+            --project "${{ steps.target.outputs.project_id }}" \
             --cwd apps/web
 
       - name: Deployment skipped (missing Vercel secrets)
-        if: ${{ !(env.VERCEL_TOKEN != '' && env.VERCEL_ORG_ID != '' && env.VERCEL_PROJECT_ID != '') }}
+        if: ${{ !(env.VERCEL_TOKEN != '' && env.VERCEL_ORG_ID != '') }}
         run: echo "Vercel secrets are not set; skip deploy."
+
+      - name: Deployment skipped (missing target project)
+        if: ${{ steps.target.outputs.project_id == '' }}
+        run: echo "Target project id is missing for environment '${{ steps.target.outputs.deploy_env }}'; skip deploy."
