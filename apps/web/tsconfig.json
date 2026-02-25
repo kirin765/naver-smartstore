@@ -16,7 +16,9 @@
     "plugins": [{ "name": "next" }],
     "paths": {
       "@/*": ["./src/*"],
-      "@shared/*": ["../../packages/shared/src/*"]
+      "@shared/*": ["../../packages/shared/src/*"],
+      "@naver-smartstore/shared/*": ["../../packages/shared/src/*"],
+      "@naver-smartstore/shared": ["../../packages/shared/src/index.ts"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
