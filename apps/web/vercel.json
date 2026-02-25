@@ -1,6 +1,6 @@
 {
-  "installCommand": "npm install --prefix .. --no-audit --ignore-scripts",
-  "buildCommand": "npm run build",
+  "installCommand": "if [ -d \"apps/web\" ]; then cd apps/web; fi; npm install --no-audit --ignore-scripts",
+  "buildCommand": "if [ -d \"apps/web\" ]; then cd apps/web; fi; npm run build",
   "outputDirectory": ".next",
   "framework": "nextjs"
 }
