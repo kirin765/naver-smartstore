@@ -15,6 +15,10 @@
   "devDependencies": {
     "typescript": "^5.3.0"
   },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "engines": {
     "node": ">=20",
     "pnpm": ">=6.35.1"

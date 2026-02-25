@@ -1,6 +1,6 @@
 {
-  "buildCommand": "pnpm build",
-  "installCommand": "npm -s install -g pnpm@7.33.6 && pnpm install --frozen-lockfile=false",
+  "buildCommand": "cd apps/web && npm run build",
+  "installCommand": "npm install --legacy-peer-deps",
   "outputDirectory": ".next",
   "framework": "nextjs"
 }
