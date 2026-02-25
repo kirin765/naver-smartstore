@@ -1,5 +1,5 @@
 {
-  "installCommand": "if [ -d \"apps/web\" ]; then cd apps/web; fi; npm install --no-audit --ignore-scripts",
+  "installCommand": "[ -f pnpm-workspace.yaml ] && npm install --workspaces --include=dev --no-audit --ignore-scripts || npm install --include=dev --no-audit --ignore-scripts",
   "buildCommand": "if [ -d \"apps/web\" ]; then cd apps/web; fi; npm run build",
   "outputDirectory": ".next",
   "framework": "nextjs"
