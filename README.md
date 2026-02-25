@@ -189,3 +189,9 @@ pnpm start
   - `/products`, `/products/new`, `/settings` 접근
   - `POST /api/analyze/product-image`
   - `POST /api/generate/full`
+
+### GitHub Actions 수동 배포
+
+- `Actions > Deploy`에서 `Run workflow`로 수동 배포 가능
+  - `ref` 입력값: 배포할 git ref(예: `main`, 커밋 SHA, 태그)를 지정
+  - 입력 미지정 시 체크아웃 기준 브랜치의 최신 커밋 기준으로 동작

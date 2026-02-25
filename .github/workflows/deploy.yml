@@ -4,6 +4,19 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Deploy this git ref. Default is current checked out SHA.'
+        required: false
+        default: ''
+
+jobs:
+  deploy:
+    name: Deploy to Vercel
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: github.ref == 'refs/heads/main'
 
 jobs:
   deploy:
@@ -20,6 +33,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
