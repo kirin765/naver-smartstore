@@ -1,11 +1,7 @@
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
 import { createClient } from '@/lib/supabase/server'
+import { getOpenAIClient } from '@/lib/openai/client'
 import { checkGenerationAccess, consumeCredits } from '@/lib/generation-access'
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
 
 type Body = {
   productId?: string
@@ -80,6 +76,7 @@ export async function POST(request: Request) {
 }
 `
 
+    const openai = getOpenAIClient()
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [

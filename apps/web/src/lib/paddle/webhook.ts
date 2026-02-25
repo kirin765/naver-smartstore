@@ -45,6 +45,7 @@ export function extractUserId(payload: Record<string, unknown>): string | null {
 export function extractPlanCode(payload: Record<string, unknown>): string | null {
   return (
     (payload as any)?.data?.custom_data?.plan_code ||
+    (payload as any)?.data?.custom_data?.planCode ||
     (payload as any)?.custom_data?.plan_code ||
     (payload as any)?.custom_data?.planCode ||
     (payload as any)?.data?.planCode ||

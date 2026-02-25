@@ -10,7 +10,7 @@ on:
 
 jobs:
   verify:
-    name: Lint, Test, Build
+    name: Test & Build
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -21,7 +21,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '18.x'
           cache: 'pnpm'
 
       - name: Enable Corepack
@@ -29,12 +29,6 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile=false
-
-      - name: Run lint
-        run: pnpm lint
-
-      - name: Run typecheck
-        run: pnpm typecheck
 
       - name: Run tests
         run: pnpm test

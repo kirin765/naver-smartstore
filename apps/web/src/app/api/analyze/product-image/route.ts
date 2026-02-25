@@ -1,12 +1,8 @@
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
 import { createClient } from '@/lib/supabase/server'
 import { IMAGE_ANALYSIS_PROMPT_VERSION } from '@naver-smartstore/shared/constants'
 import { MAX_IMAGE_UPLOAD_COUNT } from '@naver-smartstore/shared/constants'
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+import { getOpenAIClient } from '@/lib/openai/client'
 
 type AnalyzeBody = {
   productId?: string
@@ -87,6 +83,7 @@ export async function POST(request: Request) {
 }
 `
 
+    const openai = getOpenAIClient()
     const completion = await openai.chat.completions.create({
       model: options.preferText ? 'gpt-4o-mini' : 'gpt-4o',
       messages: [
