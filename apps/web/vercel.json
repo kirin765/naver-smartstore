@@ -1,6 +1,6 @@
 {
   "buildCommand": "cd ../.. && npm run -w web build",
-  "installCommand": "cd ../.. && corepack enable && corepack prepare npm@11.9.0 --activate && npm install --no-audit --ignore-scripts",
+  "installCommand": "cd ../.. && npm install --no-audit --ignore-scripts",
   "outputDirectory": ".next",
   "framework": "nextjs"
 }
