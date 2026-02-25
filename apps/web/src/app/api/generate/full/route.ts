@@ -1,13 +1,47 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { createClient } from '@/lib/supabase/server'
-import { CREDIT_COSTS } from '@naver-smartstore/shared/constants'
+import { checkGenerationAccess, consumeCredits } from '@/lib/generation-access'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
 
-// Generate all content at once
+type GenerateBody = {
+  productName: string
+  category?: string
+  brand?: string
+  price?: number | null
+  keywords?: string[]
+  tone?: 'professional' | 'friendly' | 'expert'
+  productId?: string
+}
+
+function parseSuggestions(raw: string) {
+  try {
+    const parsed = JSON.parse(raw)
+    return {
+      title: parsed.title || '',
+      alternatives: parsed.alternatives || [],
+      description: parsed.description || '',
+      bulletSpecs: parsed.bulletSpecs || parsed.bullets || [],
+      tags: parsed.tags || [],
+      source: parsed.source || 'text',
+      confidence: typeof parsed.confidence === 'number' ? parsed.confidence : undefined,
+    }
+  } catch (error) {
+    return {
+      title: '',
+      alternatives: [],
+      description: '',
+      bulletSpecs: [],
+      tags: [],
+      source: 'text',
+      confidence: 0.0,
+    }
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const supabase = createClient()
@@ -17,34 +51,51 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
     }
 
-    const body = await request.json()
-    const { productName, category, brand, price, keywords, tone = 'professional' } = body
+    const body = (await request.json()) as GenerateBody
+    const {
+      productName,
+      category,
+      brand,
+      price,
+      keywords,
+      tone = 'professional',
+      productId,
+    } = body
 
     if (!productName) {
       return NextResponse.json({ error: '상품명을 입력해주세요.' }, { status: 400 })
     }
 
-    // Check credits
-    const { data: credits } = await supabase
-      .from('user_credits')
-      .select('balance')
-      .eq('user_id', user.id)
-      .single()
-
-    const cost = CREDIT_COSTS.full
-    if (!credits || credits.balance < cost) {
+    const access = await checkGenerationAccess(supabase, user.id, 'full')
+    if (!access.ok) {
       return NextResponse.json(
-        { error: '크레딧이 부족합니다. (전체 생성: 5 크레딧)' },
-        { status: 403 }
+        { error: access.message, code: access.errorCode },
+        { status: access.status }
       )
     }
 
-    // Build prompt
     const keywordText = keywords?.length ? `\n핵심 키워드: ${keywords.join(', ')}` : ''
     const brandText = brand ? `\n브랜드: ${brand}` : ''
     const categoryText = category ? `\n카테고리: ${category}` : ''
     const priceText = price ? `\n가격: ${price}원` : ''
 
+    let analysisText = ''
+    let source: 'text' | 'image' | 'combined' = 'text'
+    if (productId) {
+      const { data: product } = await supabase
+        .from('products')
+        .select('image_analysis')
+        .eq('id', productId)
+        .eq('user_id', user.id)
+        .single()
+
+      if (product?.image_analysis) {
+        source = 'image'
+        analysisText = `\n이미지 분석 기반 제안(참조): ${JSON.stringify(product.image_analysis)}`
+      }
+    }
+
+    const finalSource = analysisText ? 'combined' : source
     const prompt = `
 You are an expert Naver SmartStore product listing copywriter.
 
@@ -61,6 +112,7 @@ Rules:
 - Focus on benefits not just features
 - Use short paragraphs
 - Make it persuasive for Naver SmartStore shoppers
+- Tone: ${tone}
 
 Output JSON format:
 {
@@ -72,46 +124,51 @@ Output JSON format:
 }
 
 상품명: ${productName}${categoryText}${brandText}${priceText}${keywordText}
+${analysisText}
 `
 
-    // Call OpenAI
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
         { role: 'system', content: 'You are an expert product listing copywriter. Output ONLY valid JSON.' },
-        { role: 'user', content: prompt }
+        { role: 'user', content: prompt },
       ],
       response_format: { type: 'json_object' },
       temperature: 0.7,
     })
 
-    const result = JSON.parse(completion.choices[0].message.content || '{}')
+    const parsed = parseSuggestions(completion.choices[0].message.content || '{}')
 
-    // Deduct credits
-    await supabase
-      .from('user_credits')
-      .update({
-        balance: credits.balance - cost,
-        lifetime_usage: credits.lifetime_usage + cost,
-      })
-      .eq('user_id', user.id)
+    const consumeResult = await consumeCredits(
+      supabase,
+      user.id,
+      access.cost,
+      `full generation${productId ? ` (product:${productId})` : ''}`
+    )
+    if (!consumeResult.ok) {
+      return NextResponse.json({ error: consumeResult.message || '크레딧 차감 실패' }, { status: 409 })
+    }
 
-    // Log generation
     await supabase
       .from('generation_logs')
       .insert({
         user_id: user.id,
+        product_id: productId || null,
         generation_type: 'full',
-        credits_used: cost,
+        credits_used: access.cost,
+        input_tokens: completion.usage?.prompt_tokens ?? null,
+        output_tokens: completion.usage?.completion_tokens ?? null,
       })
 
     return NextResponse.json({
-      title: result.title,
-      alternatives: result.alternatives,
-      description: result.description,
-      bulletSpecs: result.bulletSpecs,
-      tags: result.tags,
-      creditsUsed: cost,
+      title: parsed.title,
+      alternatives: parsed.alternatives,
+      description: parsed.description,
+      bulletSpecs: parsed.bulletSpecs,
+      tags: parsed.tags,
+      creditsUsed: access.cost,
+      source: finalSource,
+      confidence: parsed.confidence ?? (analysisText ? 0.9 : 0.8),
     })
   } catch (error) {
     console.error('Full generation error:', error)

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { createClient } from '@/lib/supabase/server'
-import { CREDIT_COSTS } from '@naver-smartstore/shared/constants'
+import { checkGenerationAccess, consumeCredits } from '@/lib/generation-access'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -18,27 +18,47 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { productName, category, brand, keywords, tone = 'professional' } = body
+    const {
+      productName,
+      category,
+      brand,
+      keywords,
+      tone = 'professional',
+      productId,
+    } = body as {
+      productName: string
+      category?: string
+      brand?: string
+      keywords?: string[]
+      tone?: string
+      productId?: string
+    }
 
     if (!productName) {
       return NextResponse.json({ error: '상품명을 입력해주세요.' }, { status: 400 })
     }
 
-    // Check credits
-    const { data: credits } = await supabase
-      .from('user_credits')
-      .select('balance')
-      .eq('user_id', user.id)
-      .single()
-
-    const cost = CREDIT_COSTS.title
-    if (!credits || credits.balance < cost) {
+    const access = await checkGenerationAccess(supabase, user.id, 'title')
+    if (!access.ok) {
       return NextResponse.json(
-        { error: '크레딧이 부족합니다. 크레딧을 구매해주세요.' },
-        { status: 403 }
+        { error: access.message, code: access.errorCode },
+        { status: access.status }
       )
     }
 
+    let analysisText = ''
+    if (productId) {
+      const { data: product } = await supabase
+        .from('products')
+        .select('image_analysis')
+        .eq('id', productId)
+        .eq('user_id', user.id)
+        .single()
+
+      if (product?.image_analysis) {
+        analysisText = `\n이미지 분석 기반 제안:\n${JSON.stringify(product.image_analysis)}`
+      }
+    }
     // Build prompt
     const keywordText = keywords?.length ? `\n핵심 키워드: ${keywords.join(', ')}` : ''
     const brandText = brand ? `\n브랜드: ${brand}` : ''
@@ -47,6 +67,8 @@ export async function POST(request: Request) {
     const prompt = `
 You are an expert Naver SmartStore product listing copywriter.
 Generate compelling, SEO-optimized product titles for Korean e-commerce.
+Use the following image analysis (if available):
+${analysisText}
 
 Rules:
 1. Include relevant keywords naturally
@@ -76,16 +98,19 @@ Output JSON format:
       temperature: 0.7,
     })
 
-    const result = JSON.parse(completion.choices[0].message.content || '{}')
+    const parsed = completion.choices[0].message.content || '{}'
+    const result = (() => {
+      try {
+        return JSON.parse(parsed)
+      } catch {
+        return { title: '', alternatives: [] }
+      }
+    })()
 
-    // Deduct credits
-    await supabase
-      .from('user_credits')
-      .update({
-        balance: credits.balance - cost,
-        lifetime_usage: credits.lifetime_usage + cost,
-      })
-      .eq('user_id', user.id)
+    const consumeResult = await consumeCredits(supabase, user.id, access.cost, `title generation${productId ? ` (product:${productId})` : ''}`)
+    if (!consumeResult.ok) {
+      return NextResponse.json({ error: consumeResult.message || '크레딧 차감 실패' }, { status: 409 })
+    }
 
     // Log generation
     await supabase
@@ -93,13 +118,20 @@ Output JSON format:
       .insert({
         user_id: user.id,
         generation_type: 'title',
-        credits_used: cost,
+        product_id: productId || null,
+        credits_used: access.cost,
+        input_tokens: completion.usage?.prompt_tokens ?? null,
+        output_tokens: completion.usage?.completion_tokens ?? null,
       })
+
+    const source = analysisText ? 'combined' : 'text'
 
     return NextResponse.json({
       title: result.title,
       alternatives: result.alternatives,
-      creditsUsed: cost,
+      creditsUsed: access.cost,
+      source,
+      confidence: analysisText ? 0.92 : 0.8,
     })
   } catch (error) {
     console.error('Title generation error:', error)

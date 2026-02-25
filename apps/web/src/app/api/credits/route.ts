@@ -24,6 +24,11 @@ export async function GET() {
     return NextResponse.json({
       balance: credits?.balance || 0,
       lifetimeUsage: credits?.lifetime_usage || 0,
+      subscriptionStatus: credits?.subscription_status || 'none',
+      planCode: credits?.plan_code || null,
+      subscriptionExpiresAt: credits?.subscription_expires_at || null,
+      subscriptionNextBillingAt: credits?.subscription_next_billing_at || null,
+      subscriptionId: credits?.paddle_subscription_id || null,
       transactions: credit_transactions || [],
     })
   } catch (error) {

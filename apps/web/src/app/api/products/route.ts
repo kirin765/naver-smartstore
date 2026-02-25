@@ -49,6 +49,7 @@ export async function POST(request: Request) {
         brand: body.brand,
         price: body.price,
         keywords: body.keywords || [],
+        image_urls: body.image_urls || [],
         status: 'draft',
       })
       .select()

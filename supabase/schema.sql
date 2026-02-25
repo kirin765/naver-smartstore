@@ -37,6 +37,12 @@ CREATE TABLE products (
     generated_bullet_specs TEXT[],
     generated_tags TEXT[],
     
+    -- Media & analysis
+    image_urls TEXT[],
+    image_analysis JSONB,
+    analysis_status TEXT CHECK (analysis_status IS NULL OR analysis_status IN ('pending', 'done', 'failed')),
+    analysis_prompt_version TEXT,
+    
     -- Status
     status TEXT DEFAULT 'draft' CHECK (status IN ('draft', 'published')),
     
@@ -54,6 +60,12 @@ CREATE TABLE user_credits (
     user_id UUID UNIQUE NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     balance INTEGER NOT NULL DEFAULT 0,
     lifetime_usage INTEGER NOT NULL DEFAULT 0,
+    paddle_customer_id TEXT,
+    paddle_subscription_id TEXT,
+    subscription_status TEXT NOT NULL DEFAULT 'none',
+    plan_code TEXT,
+    subscription_expires_at TIMESTAMPTZ,
+    subscription_next_billing_at TIMESTAMPTZ,
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -64,6 +76,7 @@ CREATE TABLE credit_transactions (
     amount INTEGER NOT NULL,  -- Positive = credit, Negative = debit
     type TEXT NOT NULL,       -- 'purchase', 'usage', 'bonus', 'refund'
     description TEXT,
+    provider_reference_id TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -72,9 +85,21 @@ CREATE TABLE credit_packages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
     credits INTEGER NOT NULL,
+    plan_code TEXT UNIQUE,
     price_krw INTEGER NOT NULL,  -- Price in KRW (0 for free tier)
+    is_subscription_plan BOOLEAN DEFAULT FALSE,
+    provider_product_id TEXT,
+    provider_price_id TEXT,
     is_active BOOLEAN DEFAULT TRUE,
     sort_order INTEGER DEFAULT 0
+);
+
+CREATE TABLE paddle_webhook_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    event_id TEXT UNIQUE NOT NULL,
+    event_type TEXT NOT NULL,
+    provider_payload JSONB NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- =====================================================
@@ -142,3 +167,11 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- Seed plans for Paddle/credit subscriptions
+INSERT INTO credit_packages (name, plan_code, credits, price_krw, is_active, is_subscription_plan, sort_order)
+VALUES
+  ('Starter', 'starter', 500, 9900, TRUE, TRUE, 1),
+  ('Pro', 'pro', 1500, 23900, TRUE, TRUE, 2),
+  ('일회성 충전 100', 'credit100', 100, 3900, TRUE, FALSE, 10)
+ON CONFLICT (plan_code) DO NOTHING;

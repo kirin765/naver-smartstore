@@ -17,7 +17,7 @@ export default async function DashboardPage() {
       .eq('user_id', user.id),
     supabase
       .from('user_credits')
-      .select('balance, lifetime_usage')
+      .select('balance, lifetime_usage, subscription_status, plan_code')
       .eq('user_id', user.id)
       .single(),
     supabase
@@ -41,6 +41,16 @@ export default async function DashboardPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div className="bg-white p-6 rounded-lg border">
+          <div className="text-sm text-gray-600">구독 상태</div>
+          <div className="text-2xl font-bold text-blue-600 mt-2">
+            {credits?.subscription_status || 'none'}
+          </div>
+          <div className="text-xs text-gray-500 mt-1">
+            플랜: {credits?.plan_code || '미적용'}
+          </div>
+        </div>
+
         <div className="bg-white p-6 rounded-lg border">
           <div className="text-3xl font-bold text-blue-600">
             {credits?.balance ?? 0}

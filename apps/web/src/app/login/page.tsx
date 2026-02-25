@@ -58,13 +58,13 @@ export default function LoginPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-2 border rounded
+              className="w-full px-4 py-2 border rounded-lg"
+              required
             />
           </div>
 
           <div>
-           -lg"
-              required <label className="block text-sm font-medium mb-1">비밀번호</label>
+            <label className="block text-sm font-medium mb-1">비밀번호</label>
             <input
               type="password"
               value={password}

@@ -2,12 +2,36 @@
 
 import { useEffect, useState } from 'react'
 
+type PlanPackage = {
+  plan_code: string
+  name: string
+  credits: number
+  price_krw: number
+}
+
+type CreditState = {
+  balance: number
+  lifetimeUsage: number
+  subscriptionStatus: string
+  planCode: string | null
+  subscriptionExpiresAt: string | null
+}
+
 export default function SettingsPage() {
-  const [credits, setCredits] = useState({ balance: 0, lifetimeUsage: 0 })
+  const [credits, setCredits] = useState<CreditState>({
+    balance: 0,
+    lifetimeUsage: 0,
+    subscriptionStatus: 'none',
+    planCode: null,
+    subscriptionExpiresAt: null,
+  })
+  const [plans, setPlans] = useState<PlanPackage[]>([])
+  const [processingPlan, setProcessingPlan] = useState('')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     loadCredits()
+    loadPlans()
   }, [])
 
   const loadCredits = async () => {
@@ -18,12 +42,50 @@ export default function SettingsPage() {
         setCredits({
           balance: data.balance || 0,
           lifetimeUsage: data.lifetimeUsage || 0,
+          subscriptionStatus: data.subscriptionStatus || 'none',
+          planCode: data.planCode || null,
+          subscriptionExpiresAt: data.subscriptionExpiresAt || null,
         })
       }
     } catch (error) {
       console.error('Load credits error:', error)
+    }
+  }
+
+  const loadPlans = async () => {
+    try {
+      const res = await fetch('/api/billing/paddle/plans')
+      const data = await res.json()
+      if (res.ok) {
+        setPlans(data.packages || [])
+      }
+    } catch (error) {
+      console.error('Load plans error:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const startCheckout = async (planCode: string) => {
+    setProcessingPlan(planCode)
+    try {
+      const res = await fetch('/api/billing/paddle/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planCode }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) {
+        alert(data.error || '결제 준비에 실패했습니다.')
+        return
+      }
+
+      window.location.href = data.checkoutUrl
+    } catch (error) {
+      alert('결제 페이지 이동 중 오류가 발생했습니다.')
+    } finally {
+      setProcessingPlan('')
     }
   }
 
@@ -50,13 +112,45 @@ export default function SettingsPage() {
               <div className="text-sm text-gray-600">총 사용</div>
             </div>
           </div>
+        </div>
 
-          <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <p className="text-sm text-yellow-800">
-              💳 크레딧 구매는 현재 준비 중입니다. 기다려주세요!
-            </p>
+        <div className="bg-white p-6 rounded-lg border">
+          <h2 className="text-lg font-semibold mb-4">구독 상태</h2>
+          <div className="p-4 bg-blue-50 rounded-lg">
+            <div className="mb-2">상태: {credits.subscriptionStatus}</div>
+            <div className="text-sm text-gray-600">
+              현재 플랜: {credits.planCode || '미적용'}
+            </div>
+            <div className="text-sm text-gray-600">
+              만료일: {credits.subscriptionExpiresAt ? new Date(credits.subscriptionExpiresAt).toLocaleString('ko-KR') : '-'}
+            </div>
           </div>
         </div>
+
+        {plans.length > 0 ? (
+          <div className="bg-white p-6 rounded-lg border">
+            <h2 className="text-lg font-semibold mb-4">구독 플랜</h2>
+            <div className="grid gap-3">
+              {plans.map(plan => (
+                <div key={plan.plan_code} className="p-4 border rounded-lg flex items-center justify-between">
+                  <div>
+                    <div className="font-medium">{plan.name}</div>
+                    <div className="text-sm text-gray-600">
+                      월 {plan.credits}크레딧 | {plan.price_krw.toLocaleString('ko-KR')}원
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => startCheckout(plan.plan_code)}
+                    disabled={processingPlan === plan.plan_code}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {processingPlan === plan.plan_code ? '이동 중...' : '구독/구매'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         {/* Usage Guide */}
         <div className="bg-white p-6 rounded-lg border">

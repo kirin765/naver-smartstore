@@ -37,3 +37,25 @@ export type GenerationType = typeof GENERATION_TYPES[number];
 // Status
 export const PRODUCT_STATUS = ['draft', 'published'] as const;
 export type ProductStatus = typeof PRODUCT_STATUS[number];
+
+// Subscription
+export const SUBSCRIPTION_STATUS = [
+  'none',
+  'active',
+  'past_due',
+  'canceled',
+  'expired',
+  'trial',
+] as const;
+export type SubscriptionStatus = typeof SUBSCRIPTION_STATUS[number];
+
+export const IMAGE_ANALYSIS_PROMPT_VERSION = 'v1';
+
+export const MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024;
+export const MAX_IMAGE_UPLOAD_COUNT = 8;
+export const ALLOWED_IMAGE_MIME_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/heic',
+];

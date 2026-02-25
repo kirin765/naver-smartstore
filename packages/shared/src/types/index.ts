@@ -11,9 +11,27 @@ export interface Product {
   generated_description?: string;
   generated_bullet_specs?: string[];
   generated_tags?: string[];
+  image_urls?: string[];
+  image_analysis?: any;
+  analysis_status?: 'pending' | 'done' | 'failed' | null;
+  analysis_prompt_version?: string;
   status: 'draft' | 'published';
   created_at: string;
   updated_at: string;
+}
+
+export interface ImageAnalysisSuggestion {
+  candidate_product_name?: string;
+  category_guess?: string;
+  brand?: string;
+  materials?: string[];
+  features?: string[];
+  selling_points?: string[];
+  search_tags?: string[];
+  description_html?: string;
+  price_guess?: number;
+  confidence?: number;
+  source?: 'image' | 'text' | 'combined';
 }
 
 export interface ProductInput {
@@ -30,6 +48,12 @@ export interface UserCredits {
   user_id: string;
   balance: number;
   lifetime_usage: number;
+  paddle_customer_id?: string | null;
+  paddle_subscription_id?: string | null;
+  subscription_status?: 'none' | 'active' | 'past_due' | 'canceled' | 'expired' | 'trial';
+  plan_code?: string | null;
+  subscription_expires_at?: string | null;
+  subscription_next_billing_at?: string | null;
   updated_at: string;
 }
 
