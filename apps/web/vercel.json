@@ -1,6 +1,6 @@
 {
   "buildCommand": "pnpm build",
-  "installCommand": "npm -s install -g pnpm@9.12.0 && pnpm install --frozen-lockfile=false",
+  "installCommand": "npm -s install -g pnpm@8.15.8 && pnpm install --frozen-lockfile=false",
   "outputDirectory": ".next",
   "framework": "nextjs"
 }
