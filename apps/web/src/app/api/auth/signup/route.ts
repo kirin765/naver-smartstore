@@ -32,9 +32,14 @@ export async function POST(request: Request) {
       )
     }
 
+    const requiresEmailConfirmation = !data.session
+
     return NextResponse.json({
       user: data.user,
-      message: '회원가입 완료! 이메일을 확인해주세요.',
+      message: requiresEmailConfirmation
+        ? '회원가입이 완료되었습니다. 이메일 인증 후 로그인해 주세요.'
+        : '회원가입이 완료되었습니다.',
+      requiresEmailConfirmation,
     })
   } catch (error) {
     console.error('Signup error:', error)

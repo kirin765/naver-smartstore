@@ -44,6 +44,9 @@ export default async function DashboardLayout({
           </div>
           
           <div className="flex items-center gap-4">
+            <Link href="/" className="hidden md:block text-sm text-gray-500 hover:text-gray-700">
+              홈 체험(비로그인 가능)
+            </Link>
             <div className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
               크레딧: {credits?.balance ?? 0}
             </div>

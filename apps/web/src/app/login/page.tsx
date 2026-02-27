@@ -1,15 +1,21 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 export default function LoginPage() {
   const router = useRouter()
+  const [notice, setNotice] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    setNotice(params.get('notice') || '')
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -29,7 +35,7 @@ export default function LoginPage() {
         throw new Error(data.error || '로그인 실패')
       }
 
-      router.push('/dashboard')
+      router.push('/products')
     } catch (err) {
       setError(err instanceof Error ? err.message : '로그인 실패')
     } finally {
@@ -46,6 +52,11 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {notice && (
+            <div className="p-3 bg-green-50 text-green-700 rounded-lg text-sm">
+              {notice}
+            </div>
+          )}
           {error && (
             <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm">
               {error}

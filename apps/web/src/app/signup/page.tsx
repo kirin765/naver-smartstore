@@ -30,7 +30,11 @@ export default function SignupPage() {
         throw new Error(data.error || '회원가입 실패')
       }
 
-      router.push('/login?notice=회원가입 완료! 이메일을 확인해주세요.')
+      if (data.requiresEmailConfirmation) {
+        router.push('/login?notice=회원가입 완료! 이메일 인증 후 로그인해 주세요.')
+      } else {
+        router.push('/products')
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : '회원가입 실패')
     } finally {
