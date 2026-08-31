@@ -11,7 +11,7 @@
 
 ## 2) 사전 준비
 
-- Node.js 18+
+- Node.js 24+
 - pnpm 8+
 - Supabase 프로젝트 (DB + Storage)
 - OpenAI API Key
